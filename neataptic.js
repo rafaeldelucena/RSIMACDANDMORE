@@ -23,7 +23,11 @@ method.init = function() {
     this.base = 20000;
 
     // prepare indicators
-    this.addTulipIndicator('myema', 'ema', {optInTimePeriod: 6});
+    this.addTulipIndicator('myema', 'ema', {optInTimePeriod: 6}); // We are aiming for 5 to 15mins candle, and 10 to 21 candle for our EMA value
+	// Last EMA Value so we know if next EMA is above or bellow to know the current trend
+	// First value is NaN... Can't we get tulipIndicator.myema value in init function ?
+	this.lastEMAValue = this.tulipIndicators.myema.result.result;
+	this.lastEMA = 0;
 }
 
 // what happens on every new candle? 
@@ -32,10 +36,17 @@ method.update = function(candle) {
     this.real.push(candle.close);
     var last_real = this.real[this.real.length-1];
 
-    var ema = this.tulipIndicators.myema.result.result;
-    
-    this.obj['input'] = [ema/this.base,candle.volume/10000]; // divide with 20k, normalizing our input and output
-    this.obj['output'] = [ema/this.base];
+	// EMA < 0 = downtrend
+	// EMA > 0 = uptrend
+    var emaValue = this.tulipIndicators.myema.result.result;
+	var ema = emaValue-this.lastEMAValue;
+	this.lastEMA = ema;
+	// Update lastEMA
+	this.lastEMAValue=emaValue;
+
+
+    this.obj['input'] = [ema,candle.volume/10000]; 
+    this.obj['output'] = [ema];
 
     // train the neural network
     //log.info(this.obj);
@@ -73,15 +84,20 @@ method.check = function(candle) {
     */
 
     // ema
-    var ema = this.tulipIndicators.myema.result.result;
+    var ema = this.lastEMA;
 
-    //let's predict the next close price on the current close price;
-    var predicted_value = this.network.activate(ema/this.base,candle.volume/10000)*this.base;
+    //let's predict the current trend
+    var predicted_value = this.network.activate(ema,candle.volume/10000);
 
-    // % change in current close and predicted close
-    var percentage = ((predicted_value-candle.close)/candle.close)*100;
-
-    if(percentage > 1 && !this.open_order)
+    // % change in current trend and last trend
+    //var percentage = ((predicted_value-candle.close)/candle.close)*100;
+	var percentage = 100-(100*predicted_value)/this.lastEMA;
+	log.info("--------------------");
+	log.info("Predicted EMA : ",predicted_value);
+	log.info("Last EMA : ",this.lastEMA);
+	log.info("Percentage : ",percentage);
+    
+	if(percentage > 1 && !this.open_order)
     {
         log.info("Buy: $"+candle.close);
         this.price = candle.close;
