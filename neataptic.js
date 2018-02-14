@@ -25,13 +25,18 @@ method.init = function() {
     // prepare indicators
     this.addTulipIndicator('myema', 'ema', {optInTimePeriod: 6}); // We are aiming for 5 to 15mins candle, and 10 to 21 candle for our EMA value
 	// Last EMA Value so we know if next EMA is above or bellow to know the current trend
-	// First value is NaN... Can't we get tulipIndicator.myema value in init function ?
-	this.lastEMAValue = this.tulipIndicators.myema.result.result;
+
+	this.lastEMAValue = 0;
 	this.lastEMA = 0;
 }
 
 // what happens on every new candle? 
 method.update = function(candle) {
+
+    if (this.lastEMAValue == 0) {
+        this.lastEMAValue = this.tulipIndicators.myema.result.result;
+        return;
+    }
 
     this.real.push(candle.close);
     var last_real = this.real[this.real.length-1];
@@ -70,6 +75,9 @@ method.log = function() {
 
 // check is executed after the minimum history input
 method.check = function(candle) {
+    if (this.lastEMA == 0) {
+        return;
+    }
 
     /* Candle information
     { id: 103956,
